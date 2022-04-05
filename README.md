@@ -13,3 +13,7 @@ Kevin Rasmusson
 ## Questions
 
 kevin@jkmholding.com (although there are more qualified clojure devs)
+
+## Regarding use
+
+Feel free to use the code. Beware, it's similar enough to the "correct" answers that an instructor noticed. Make some adequate changes.
