@@ -90,7 +90,6 @@
         q
     ))
     (def addedToBelow (concat allBelowList (list T))) ;; converting T to list, solved problem with wrapping in vectors
-    ;; (dec (count allBelowList))
     (if (= (count allBelowList) (count Q))
         addedToBelow ;; this is if we append to last (the numbers are equal)
         (concat addedToBelow allAbove) ;; concat above to our below + T :)
@@ -156,17 +155,18 @@
     
     ;; YOUR CODE HERE
     (def setOfSymbols (set S)) ;; gives us set, removes duplicates.
-    
-    ;; (def mapOfFreq (zipmap (into [] setOfSymbols) (map #(count %) S)))
     (def badFreq (group-by setOfSymbols S)) ;; looks like {1 [1 1], 2 [2 2 2 2], 3 [3 3 ]} so we need to change to count
     (def freq (zipmap (keys badFreq) (map #(count (second %)) badFreq))) ;; from googling how to count frequencies, took forever :(
+    ;; (frequencies S)
     ;; zipmap creates map from el 1 and el 1 from to different lists, keys accesses first, counting number of vectors. (a done)
-        ;; (create-tree (sort-by :frequency (map #(make-leaf (first %) (second %)) freq)))
     (def leafs (for [k (keys freq)] (make-leaf k (get freq k))))
 
     (if (= 1 (count leafs))
-        (first leafs);; return only the first leaf
-        (create-tree (sort-by :frequency leafs))
+        (first leafs);; return only the first leaf bc we only have one
+        ;; ELSE we need to sort the multiple leaves, this is instruction (c)
+        (let [sortedLeafs (sort-by :frequency leafs)]  ;; how to sort maps by key! :: https://andersmurphy.com/2019/03/09/clojure-sorting.html
+            (create-tree sortedLeafs) ;; see instruction (d)   
+        )
     )
     
     ;; hint: my solution uses frequencies, map, keys and from edaa40.huffutil the function make-leaf.
@@ -187,24 +187,50 @@
 ;; you might need to define other functions used by "huffman-codes' in this place
 
 (declare huffman-codes)
+(defn generateNewCode [code goingLeft]
+    (if (= goingLeft true)
+        (conj code 0) ;; if we going left, we add 0
+        (conj code 1) ;; else (going right) we add 1 to code
+    )
+    ;; (apply list code) makes it to a list
+)
 
-;; (defn huffman-codes
-;;     "Given a Huffman tree, compute the Huffman codes for each symbol in it. 
-;;     Returns a map mapping each symbol to a sequence of bits (0 or 1)." 
-;;     [T]
-;; 
-;; 
-;;      ;; YOUR CODE HERE
-;;      
-;;      ;; hint: for building the map, take a look at the function into --- my solutions both look like this:
-;;      ;;       (into {} ...)
-;;      ;; they also both involve defining other functions, for computing all symbols in the tree, for 
-;;      ;; finding the bit string for a symbol in the tree, or other things...
-;; )
-;; 
-;; 
-;; (test? "huffman-codes 1" (huffman-codes ConstantSequenceTree) ConstantSequenceCodes)
-;; (test? "huffman-codes 2" (huffman-codes SimpleSequenceTree) SimpleSequenceCodes)
+(defn checkChildren [T code]
+    (if (= (:kind T) :branch)
+        ;; (
+        ;; (def leftChild (:left T)) ;; if it's a branch, we define leftChild as the tree located on :left key
+        ;; (def rightChild (:right T)) ;; same with :right key
+        (conj ;; this wrap generates the entire code with children
+            ;; (checkChildren rightChild (generateNewCode code false)) ;; false bc right
+            ;; (checkChildren leftChild (generateNewCode code true))
+            (checkChildren (:right T) (generateNewCode code false)) ;; false bc right
+            (checkChildren (:left T) (generateNewCode code true))
+        )
+        ;; )
+        {(:value T) code} ;; if not branch (a leaf) we return a map with value and code
+    )
+)
+(defn huffman-codes
+    "Given a Huffman tree, compute the Huffman codes for each symbol in it. 
+    Returns a map mapping each symbol to a sequence of bits (0 or 1)." 
+    [T]
+
+    (if (nil? T)
+        '()
+        (checkChildren T [])
+    )
+    ;; YOUR CODE HERE
+
+     
+     ;; hint: for building the map, take a look at the function into --- my solutions both look like this:
+     ;;       (into {} ...)
+     ;; they also both involve defining other functions, for computing all symbols in the tree, for 
+     ;; finding the bit string for a symbol in the tree, or other things...
+)
+
+
+(test? "huffman-codes 1" (huffman-codes ConstantSequenceTree) ConstantSequenceCodes)
+(test? "huffman-codes 2" (huffman-codes SimpleSequenceTree) SimpleSequenceCodes)
 
 
 ;;
@@ -213,19 +239,33 @@
 
 (declare huffman-encode)
 
-;; (defn huffman-encode
-;;     "Produces the complete Huffman code for a sequence of bytes (0 to 255).
-;;     A Huffman code is represented as a map containing a Huffman tree, the length of the original sequence, and the sequence of bits encoding it."
-;;     [S]
-;;     
-;;     ;; YOUR CODE HERE
-;;
-;;     ;; hint: take a look at the function mapcat; I also used huffman-tree and huffman-codes
-;; )
-;; 
-;; (test? "huffman-encode 1" (huffman-encode ConstantSequence) ConstantSequenceHuffmanCode)
-;; (test? "huffman-encode 2" (huffman-encode SimpleSequence) SimpleSequenceHuffmanCode)
-;; (test? "huffman-encode 3" (count (:bits (huffman-encode TextBytes))) 2661055)
+(defn huffman-encode
+    "Produces the complete Huffman code for a sequence of bytes (0 to 255).
+    A Huffman code is represented as a map containing a Huffman tree, the length of the original sequence, and the sequence of bits encoding it."
+    [S]
+    
+    ;; YOUR CODE HERE
+    ;; a huffman code looks like {:tree tree, :length len, :bits bits}
+    (def huffmanTree (huffman-tree S)) ;; just use our previously implemented funtion like the hint suggests
+    (def lengthOfSequence (count S)) ;; just count S
+    ;; now we need the :bits part, let's use huffman-codes that we implemented and the hint suggests
+    (def huffmanCodes (huffman-codes huffmanTree)) ;; let's get our codes
+    (def bitSequence (for [s S]
+        ;; for each we need to add bit rep
+        (get huffmanCodes s) ;; get map value by key s
+    )) ;; now bits look like ([1 0 1] [1 0] [1] etc..)
+    (def cleanBitSequence (apply concat bitSequence)) ;; https://clojuredocs.org/clojure.core/concat apply solves our problem
+    {:tree huffmanTree, :length lengthOfSequence, :bits cleanBitSequence}
+;; (mapcat #(huffmanCodes %) S)
+    
+    ;; QUESTION: how can i solve this using mapcat? didn't understand the docs
+
+    ;; hint: take a look at the function mapcat; I also used huffman-tree and huffman-codes
+)
+
+(test? "huffman-encode 1" (huffman-encode ConstantSequence) ConstantSequenceHuffmanCode)
+(test? "huffman-encode 2" (huffman-encode SimpleSequence) SimpleSequenceHuffmanCode)
+(test? "huffman-encode 3" (count (:bits (huffman-encode TextBytes))) 2661055) ;; HELP! IS THIS CORRECT?
 
 ;;
 ;;  Huffman decoding a bit sequence
@@ -233,22 +273,36 @@
 
 (declare decode-symbol)
 
-;; (defn decode-symbol
-;;     "Uses the beginning of the provided bit sequence to decode the next symbol based on the tree T.
-;;     Returns a map with the decoded symbol in the :value field and the remaining bit sequence as :remaining-bits."
-;; 
-;;     [T bits]
-;;     
-;;     ;; YOUR CODE HERE
-;;
-;;     ;; hint: this is pretty straightforward recursive descent --- you might want to use isleaf? at some point
-;;
-;; )
-;; 
-;; (test? "decode-symbol 1" (decode-symbol SimpleSequenceTree SimpleSequenceBits) {:value :a :remaining-bits (drop 1 SimpleSequenceBits)}) 
-;; (test? "decode-symbol 2" (decode-symbol SimpleSequenceTree SimpleSequenceBits) {:value :a :remaining-bits (drop 1 SimpleSequenceBits)}) 
-;; (test? "decode-symbol 3" (decode-symbol SimpleSequenceTree (drop 3 SimpleSequenceBits)) {:value :b :remaining-bits (drop 5 SimpleSequenceBits)}) 
-;; (test? "decode-symbol 4" (decode-symbol SimpleSequenceTree (drop 7 SimpleSequenceBits)) {:value :c :remaining-bits (drop 10 SimpleSequenceBits)}) 
+(defn decode-symbol
+    "Uses the beginning of the provided bit sequence to decode the next symbol based on the tree T.
+    Returns a map with the decoded symbol in the :value field and the remaining bit sequence as :remaining-bits."
+
+    [T bits]
+    
+    ;; YOUR CODE HERE
+    (if (= (:kind T) :branch)
+        (   ;; here we need recursive because it's a branch. lets check left and right
+            if (= 1 (first bits))
+                (decode-symbol ;; we go right
+                    (:right T) ;; this is the right tree
+                    (drop 1 bits) ;; we "remove" the first bit bc we have traversed one path on the tree
+                )
+                (decode-symbol ;; if not 1 go left bc it is 0
+                    (:left T) ;; just definition of left tree
+                    (drop 1 bits) ;; drop first bit like before
+                )
+        )
+        {:value (:value T) :remaining-bits bits} ;; else return the map {:value and :remaining-bits}
+    )
+
+    ;; hint: this is pretty straightforward recursive descent --- you might want to use isleaf? at some point
+
+)
+
+(test? "decode-symbol 1" (decode-symbol SimpleSequenceTree SimpleSequenceBits) {:value :a :remaining-bits (drop 1 SimpleSequenceBits)}) 
+(test? "decode-symbol 2" (decode-symbol SimpleSequenceTree SimpleSequenceBits) {:value :a :remaining-bits (drop 1 SimpleSequenceBits)}) 
+(test? "decode-symbol 3" (decode-symbol SimpleSequenceTree (drop 3 SimpleSequenceBits)) {:value :b :remaining-bits (drop 5 SimpleSequenceBits)}) 
+(test? "decode-symbol 4" (decode-symbol SimpleSequenceTree (drop 7 SimpleSequenceBits)) {:value :c :remaining-bits (drop 10 SimpleSequenceBits)}) 
 
 
 (defn huffman-decode
@@ -276,9 +330,9 @@
 
 ;; when you are done with the previous tests...
 
-;; (test? "huffman-decode 1" (huffman-decode (huffman-encode ConstantSequence)) ConstantSequence)
-;; (test? "huffman-decode 2" (huffman-decode (huffman-encode SimpleSequence)) SimpleSequence)
-;; (test? "huffman-decode 3" (huffman-decode (huffman-encode TextBytes)) TextBytes)
+(test? "huffman-decode 1" (huffman-decode (huffman-encode ConstantSequence)) ConstantSequence)
+(test? "huffman-decode 2" (huffman-decode (huffman-encode SimpleSequence)) SimpleSequence)
+(test? "huffman-decode 3" (huffman-decode (huffman-encode TextBytes)) TextBytes)
 
 
 
@@ -317,7 +371,3 @@
         (spit-bytes outfile out-data)
     )
 )
-            
-
-
-
